@@ -58,6 +58,7 @@ const initialBlogs = [
 ]
 
 let token = null
+let id = null
 
 beforeEach(async () => {
   // Tehtävä 4.23:
@@ -109,13 +110,12 @@ test('a valid blog can be added with post', async () => {
     url: 'https://www.guitar.com',
     likes: 1
   }
-  await api
+  const vastaus = await api
     .post('/api/blogs')
     .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
-
   const response = await api.get('/api/blogs')
   const contents = response.body.map(r => r.title)
   expect(response.body).toHaveLength(initialBlogs.length + 1)
@@ -155,6 +155,32 @@ test('if title or url is missing, status 400 is returned', async () => {
     .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(newBlog)
     .expect(400)
+})
+
+test('remove the added blog', async () => {
+  const newBlog = {
+    title: 'How to play Guitar',
+    author: 'Steve Vai',
+    url: 'https://www.steve.com',
+    likes: 1
+  }
+  const vastaus = await api
+    .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
+    .send(newBlog)
+    .expect(201)
+    .expect('Content-Type', /application\/json/)
+  id = vastaus.body.id
+  const allBlogs = await api.get('/api/blogs')
+  console.log(id)
+  await api
+    .delete(`/api/blogs/${id}`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(204)
+  
+  const afterDelete = await api.get('/api/blogs')
+  //console.log(afterDelete.body)
+  expect(afterDelete.body).toHaveLength(allBlogs.body.length - 1)
 })
 
 test('increase likes of the first blog by 1', async() => {

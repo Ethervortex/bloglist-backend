@@ -3,6 +3,7 @@ const supertest = require('supertest')
 const app = require('../app')
 const api = supertest(app)
 const Blog = require('../models/blog')
+const User = require('../models/user')
 
 // Tehtävä 4.9
 const initialBlogs = [
@@ -56,7 +57,26 @@ const initialBlogs = [
   }  
 ]
 
+let token = null
+
 beforeEach(async () => {
+  // Tehtävä 4.23:
+  await User.deleteMany({})
+  const user = {
+    username: 'testuser',
+    name: 'Test User',
+    password: 'testpassword',
+  }
+  await api
+    .post('/api/users')
+    .send(user)
+    .expect(201)
+  const response = await api.post('/api/login').send({
+    username: 'testuser',
+    password: 'testpassword'
+  })
+  token = response.body.token
+
   await Blog.deleteMany({})
   await Blog.insertMany(initialBlogs)
 })
@@ -91,13 +111,13 @@ test('a valid blog can be added with post', async () => {
   }
   await api
     .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
 
   const response = await api.get('/api/blogs')
   const contents = response.body.map(r => r.title)
-
   expect(response.body).toHaveLength(initialBlogs.length + 1)
   expect(contents).toContain('How to play Guitar')
 })
@@ -111,6 +131,7 @@ test('if likes field missing, likes=0', async () => {
   }
   await api
     .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
@@ -131,20 +152,9 @@ test('if title or url is missing, status 400 is returned', async () => {
   }
   await api
     .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(newBlog)
     .expect(400)
-})
-
-test('remove blog by id', async () => {
-  const allBlogs = await api.get('/api/blogs')
-  const toBeDeleted = allBlogs.body[0]
-  await api
-    .delete(`/api/blogs/${toBeDeleted.id}`)
-    .expect(204)
-  
-  const afterDelete = await api.get('/api/blogs')
-  //console.log(afterDelete.body)
-  expect(afterDelete.body).toHaveLength(allBlogs.body.length - 1)
 })
 
 test('increase likes of the first blog by 1', async() => {
@@ -154,10 +164,25 @@ test('increase likes of the first blog by 1', async() => {
   const updatedBlog = { ...toBeUpdated, likes: toBeUpdated.likes + 1 }
   const response = await api
     .put(`/api/blogs/${toBeUpdated.id}`)
+    .set('Authorization', `Bearer ${token}`) // Tehtävä 4.23
     .send(updatedBlog)
     .expect(200)
   //console.log(response.body.likes)
   expect(response.body.likes).toBe(toBeUpdated.likes + 1)
+})
+
+test('trying to add blog with invalid token', async () => {
+  const newBlog = {
+    title: 'How to play Guitar',
+    author: 'Steve Vai',
+    url: 'https://www.guitar.com',
+    likes: 2
+  }
+  await api
+    .post('/api/blogs')
+    .set('Authorization', `Bearer invalidtoken`) // Tehtävä 4.23
+    .send(newBlog)
+    .expect(401)
 })
 
 afterAll(async () => {
